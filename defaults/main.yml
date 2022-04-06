@@ -1,0 +1,33 @@
+##############################################################
+#                     Backup role                            #
+##############################################################
+
+# Define backup server
+backup_server: CHANGEME
+
+# Define clent's public IP for backups if it is different from ansible_host ip 
+backup_public_ip: "{{ ansible_host }}"
+
+# List of folders which we want to backup
+# - plese do not backup database folders this way, 
+# prepare periodic sql dump inside one of backuped folders instead
+backup_this_folders:
+  - /home
+
+# How often do backup (cron syntax)
+backup_minute: "0"
+backup_hour: "0"
+backup_day: "*"
+backup_month: "*"
+backup_weekday: "*"
+
+# How often will be cleanup done (cron syntax)
+backup_cleanup_minute: "0"
+backup_cleanup_hour: "1"
+backup_cleanup_day: "*"
+backup_cleanup_month: "*"
+backup_cleanup_weekday: "*"
+
+# Rdiff-backup syntax --remove-older-than
+backup_cleanup_older_than: "4W"
+

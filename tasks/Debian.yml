@@ -1,0 +1,106 @@
+#################################################################################
+## Prepare backup server:
+#
+- name: "{{ role }} | Install required packages on the backup server"
+  apt:
+    pkg:
+      - rdiff-backup
+  delegate_to: "{{ backup_server }}"
+
+- name: "{{ role }} | Create user for backups"
+  user:
+    name: backup
+    comment: User for make backups
+    shell: /bin/false
+    home: /home/backup
+    create_home: yes
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+    ssh_key_comment: "backup@{{ backup_server }}"
+    state: present
+  register: user
+  delegate_to: "{{ backup_server }}"
+
+#- name: debug
+#  debug:
+#    #msg: "{{ user['ssh_public_key'] }}"
+#    msg: "{{ ansible_port }}"
+
+- name: "{{ role }} | Create backup directory for client server"
+  file:
+    path: "/home/backup/{{ inventory_hostname }}"
+    state: directory
+    mode: '0755'
+  delegate_to: "{{ backup_server }}"
+
+#################################################################################
+## Prepare client:
+
+- name: "{{ role }} | Install required packages"
+  apt:
+    pkg:
+      - rdiff-backup
+  
+- name: "{{ role }} | {{ inventory_hostname }} - Add {{ backup_server }}'s SSH key to authorized keys"
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ user['ssh_public_key'] }}"
+    key_options: command="rdiff-backup --server --restrict-read-only /",no-port-forwarding,no-X11-forwarding,no-pty
+
+- name: "{{ role }} | SSHd set PermitRootLogin without-password"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^PermitRootLogin'
+    line: PermitRootLogin without-password
+    validate: /usr/sbin/sshd -t -f %s
+
+- name: "{{ role }} | Reload SSHd"
+  service:
+    name: sshd
+    state: reloaded
+
+################################################################################
+# Set cron jobs on backup server:
+
+- name: "{{ role }} | Prepare cron job command"
+  set_fact:
+    include_dirs: "{{ include_dirs }}--include {{ backup_folder }} "
+  loop: "{{ backup_this_folders }}"
+  loop_control:
+    loop_var: backup_folder
+  vars:
+    include_dirs: ""
+
+#- name: "debug"
+#  debug:
+#    msg: "rdiff-backup --create-full-path --remote-schema \"ssh -C -i /home/backup/.ssh/id_rsa -p {{ ansible_port | default(22) }} %s rdiff-backup --server\" {{ include_dirs }}--exclude '**' {{ ansible_host }}::/ /home/backup/{{ inventory_hostname }}"
+
+- name: "{{ role }} | Set cron job for doing a backup"
+  cron:
+    name: "Rdiff-backup backup job for {{ inventory_hostname }}"
+    user: root
+    minute: "{{ backup_minute }}"
+    hour: "{{ backup_hour }}"
+    day: "{{ backup_day }}"
+    month: "{{ backup_month }}"
+    weekday: "{{ backup_weekday }}"
+    job: "rdiff-backup --create-full-path --remote-schema \"ssh -C -i /home/backup/.ssh/id_rsa -p {{ ansible_port | default(22) }} -o 'StrictHostKeyChecking no' \\%s rdiff-backup --server\" {{ include_dirs }}--exclude '**' {{ backup_public_ip }}::/ /home/backup/{{ inventory_hostname }}"
+  delegate_to: "{{ backup_server }}"
+  # https://stackoverflow.com/questions/67057627/ansible-nested-loop-over-host-group-members-and-their-host-vars
+  throttle: 1
+
+- name: "{{ role }} | Set cron jobs for backup rotation"
+  cron:
+    name: "Rdiff-backup cleanup job for {{ inventory_hostname }}"
+    user: root
+    minute: "{{ backup_cleanup_minute }}"
+    hour: "{{ backup_cleanup_hour }}"
+    day: "{{ backup_cleanup_day }}"
+    month: "{{ backup_cleanup_month }}"
+    weekday: "{{ backup_cleanup_weekday }}"
+    job: "rdiff-backup --remowe-older-than {{ backup_cleanup_older_than }} /home/backup/{{ inventory_hostname }}"
+  delegate_to: "{{ backup_server }}"
+  # https://stackoverflow.com/questions/67057627/ansible-nested-loop-over-host-group-members-and-their-host-vars
+  throttle: 1
