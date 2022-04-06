@@ -34,7 +34,4 @@ jobs on the backup server.
 - Rdiff-backup does not follow symlinks to prevent loops. It is therefore necessary
 list all original folders and files in `backup_folders`.
 
-- změna zálohovaných adresářů se sice provede, ale původní zálohované adresáře 
-zůstávají na backup serveru i po odstranění ze seznamu zálohovaných adresářů.
-
-  [rdiff-backup]: <https://rdiff-backup.net/>
+[rdiff-backup]: <https://rdiff-backup.net/>
