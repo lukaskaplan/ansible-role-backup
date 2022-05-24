@@ -100,7 +100,7 @@
     day: "{{ backup_cleanup_day }}"
     month: "{{ backup_cleanup_month }}"
     weekday: "{{ backup_cleanup_weekday }}"
-    job: "rdiff-backup --remowe-older-than {{ backup_cleanup_older_than }} /home/backup/{{ inventory_hostname }}"
+    job: "rdiff-backup --remove-older-than {{ backup_cleanup_older_than }} /home/backup/{{ inventory_hostname }}"
   delegate_to: "{{ backup_server }}"
   # https://stackoverflow.com/questions/67057627/ansible-nested-loop-over-host-group-members-and-their-host-vars
   throttle: 1
